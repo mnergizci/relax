@@ -1,0 +1,19 @@
+name: relax
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # Compilers (Linux; gives you CC/CXX/FC wrappers)
+  - gcc_linux-64
+  - gxx_linux-64
+  - gfortran_linux-64
+  # Numerics / IO
+  - fftw
+  - proj
+  - libnetcdf          # <- this is "netcdf-c"
+  - netcdf-fortran
+  - gdal               # optional, but handy
+  - pkg-config
+  - make
+

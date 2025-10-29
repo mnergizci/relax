@@ -1,0 +1,1 @@
+/scratch/eemne/github/relax1/util/sdm2relax.sh
