@@ -4,3 +4,7 @@
 .waf*
 *.pyc
 build/
+examples/tutorials/*
+waf
+util2/*
+util/coulomb.sh

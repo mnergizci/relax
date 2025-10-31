@@ -1,1 +1,0 @@
-/scratch/eemne/github/relax1/util/visco2gammadot.sh

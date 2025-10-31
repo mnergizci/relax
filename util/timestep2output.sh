@@ -1,1 +1,0 @@
-/scratch/eemne/github/relax1/util/timestep2output.sh
