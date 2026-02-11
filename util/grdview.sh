@@ -31,7 +31,7 @@ usage(){
         echo "         -r reverse the y-axis"
         echo "         -s step sets the distance between vectors"
         echo "         -u defines the color scale unit"
-        echo "         -v vertical exxageration"
+        echo "         -v vertical exaggeration"
 	echo "         -t tick interval"
 	echo "         -T title header"
 	echo "         -x do not display map (only create .ps file)"
@@ -40,6 +40,8 @@ usage(){
 	echo "         -N base level"
 	echo "         -O file.ps only plot base map with extra scripts"
 	echo "         -J overwrites the geographic projections (for -J o the -b option is relative)"
+        echo "         -S size of the plot"
+        echo "         -X shift the plot horizontally on the page"
         echo "         -Y shift the plot vertically on the page"
 	echo ""
 	echo "Creates N maps based on grd files file1.grd ... fileN.grd, or based"
@@ -52,15 +54,17 @@ usage(){
 my_gmt(){
 
 	if [ -e "$U3" ]; then
-		grdview $U3 -R$bds $PROJ $PROJZ -Qc $Eset $Nset \
-		    $AXIS $Gset \
+		echo $self: grdview $U3 -Qi300 -R$bds $PROJ $PROJZ $Eset $Nset \
+		    ${AXIS}SWNEZ+ $Eset $Gset -C$colors -P -X${XSHIFT}i -Y${YSHIFT}i $iset
+		grdview $U3 -Qi300 -R$bds $PROJ $PROJZ $Eset $Nset \
+		    ${AXIS}SWNEZ+ $Eset $Gset \
 		    -K -C$colors -P -X1.2i -Y${YSHIFT}i $iset \
 		    > $PSFILE
 	else
-		echo $self: psbasemap -R$bds $PROJ $PROJZ $AXIS $Eset -K -P 
+		echo $self: psbasemap -R$bds $PROJ $PROJZ $AXIS $Eset
 		psbasemap -R$bds $PROJ $PROJZ \
 		    ${AXIS}wsne $Eset \
-		     -K -P -X1.2i -Y${YSHIFT}i \
+		     -K -P -X${XSHIFT}i -Y${YSHIFT}i \
 		    > $PSFILE
 	fi
 
@@ -94,8 +98,11 @@ my_gmt(){
 		rm -f $colors
 	fi
 
-	psbasemap -R$bds $PROJ $PROJZ \
-		${AXIS}WSNEZ+ $Eset -O -P >> $PSFILE
+	if [ ! -e "$U3" ]; then
+		echo $self: closing frame
+		psbasemap -R$bds $PROJ $PROJZ \
+			${AXIS}WSNEZ+ $Eset -O -K -P >> $PSFILE
+	fi
 
 	#echo 0 0 | psxy -O $PROJ -R$bds -Sp0.001c >> $PSFILE
 
@@ -107,12 +114,13 @@ gmtset ANOT_FONT_SIZE 12p
 gmtset COLOR_BACKGROUND 0/0/255
 gmtset COLOR_FOREGROUND 255/0/0
 gmtset COLOR_NAN 255/255/255
+#gmtset PAPER_MEDIA A0
 gmtset PAPER_MEDIA archA
 
 libdir=$(dirname $0)/../share
 EXTRA=""
 
-while getopts "b:c:e:ghi:o:p:v:s:t:T:u:xrE:G:N:O:J:Y:" flag; do
+while getopts "b:c:e:ghi:o:p:v:s:t:T:u:xrE:G:HN:O:J:S:X:Y:" flag; do
 	case "$flag" in
 	b) bset=1;bds=$OPTARG;;
 	c) cset="-c";carg=$OPTARG;;
@@ -124,25 +132,23 @@ while getopts "b:c:e:ghi:o:p:v:s:t:T:u:xrE:G:N:O:J:Y:" flag; do
 	p) pset=1;P=$OPTARG;PSSCALE=`echo $OPTARG | awk -F"/" 'function abs(x){return x<0?-x:x}{print abs($2-$1)/6}'`;;
 	r) rset=1;;
 	s) sset=1;ADX=$OPTARG;;
-	t) tset=1;tick=$OPTARG;tickz=$OPTARG;;
+	t) tset=1;tickx=$OPTARG;ticky=$OPTARG;tickz=$OPTARG;;
 	T) Tset=1;title=$OPTARG;;
 	u) uset=1;unit=$OPTARG;;
-	v) vset=1;verticalexxageration=$OPTARG;;
+	v) vset=1;verticalexaggeration=$OPTARG;;
 	x) xset=1;;
 	E) Eset="-E$OPTARG";;
 	G) Gset="-G$OPTARG";;
+	H) Hset="-H";;
 	N) Nset="-N$OPTARG";;
 	O) Oset=1;PSFILE=$(dirname $OPTARG)/$(basename $OPTARG .ps).ps;;
 	J) Jset=1;PROJ="-J$OPTARG";;
+	S) Sset=1;SIZE=$OPTARG;;
+	X) Xset=1;Xshift=$OPTARG;;
 	Y) Yset=1;Yshift=$OPTARG;;
 	esac
 done
-for item in $bset $cset $iset $oset $pset $sset $tset $vset $Tset $uset $Yset $Eset $Gset $Nset $Oset $Jset $EXTRA;do
-	shift;shift
-done
-for item in $gset $hset $xset $rset;do
-	shift;
-done
+shift $((OPTIND -1))
 
 #-------------------------------------------------------- 
 # DEFAULTS
@@ -150,7 +156,19 @@ done
 
 if [ "$vset" != "1" ]; then
 	# unused value but preserve the number of elements in call to subroutine
-	verticalexxageration=1
+	verticalexaggeration=1
+fi
+
+# size of plot
+if [ "$Sset" != "1" ]; then
+	SIZE=5
+fi
+
+# horizontal shift of plot
+if [ "$Xset" != "1" ]; then
+	XSHIFT=1.2
+else
+	XSHIFT=`echo $Xshift | awk '{print $1+1.2}'`
 fi
 
 # vertical shift of plot
@@ -183,7 +201,6 @@ else
 	echo $self: using colorfile $cptfile
 fi
 
-
 # loop over grd files
 while [ "$#" != "0" -o "$Oset" == "1" ];do
 
@@ -205,9 +222,13 @@ while [ "$#" != "0" -o "$Oset" == "1" ];do
 
 		# tick marks
 		if [ "$tset" != "1" ]; then
-			tick=`echo $bds | awk -F "/" '{s=1;print ($2-$1)/s/4}'`
+			tickx=`echo $bds | awk -F "/" '{s=1;print ($2-$1)/s/4}'`
+			ticky=`echo $bds | awk -F "/" '{s=1;print ($4-$3)/s/4}'`
+			tickz=`echo $bds | awk -F "/" '{s=1;print ($6-$5)/s/4}'`
 		fi
-		tickf=`echo $tick | awk '{print $1/4}'`
+		tickxf=`echo $tickx | awk '{print $1/2}'`
+		tickyf=`echo $ticky | awk '{print $1/2}'`
+		tickzf=`echo $tickz | awk '{print $1/2}'`
 
 		echo $self": Using directory "$WDIR", plotting index "$INDEX
 
@@ -250,8 +271,12 @@ while [ "$#" != "0" -o "$Oset" == "1" ];do
 		if [ "$gset" != "-g" ]; then
 			if [ "$Jset" == "" ]; then
 				# Cartesian coordinates
-				HEIGHT=`echo $bds | awk -F "/" '{printf("%fi\n",($4-$3)/($2-$1)*5)}'`
-				SCALE=`echo $bds | awk -F "/" -v s=$verticalexxageration '{printf("%f\n",5/($2-$1)*s)}'`
+				if [ "$Hset" == "" ]; then
+					HEIGHT=`echo $bds | awk -F "/" '{printf("%fi\n",($4-$3)/($2-$1)*5)}'`
+				else
+					HEIGHT="8i"
+				fi
+				SCALE=`echo $bds | awk -F "/" -v s=$verticalexaggeration '{printf("%f\n",5/($2-$1)*s)}'`
 				if [ "$rset" != "1" ]; then
 					PROJ="-JX5i/"$HEIGHT
 					PROJZ=-Jz$SCALE
@@ -262,12 +287,15 @@ while [ "$#" != "0" -o "$Oset" == "1" ];do
 			else
 				HEIGHT="-"
 			fi
-			AXIS=-Bf${tickf}a${tick}:"":/f${tickf}a${tick}:"":/f25a100:""::."$title":
+			AXIS=-Bf${tickxf}a${tickx}:"x":/f${tickyf}a${ticky}:"y":/f${tickzf}a${tickz}:"z"::."$title":
 		else
 			# geographic coordinates
 			HEIGHT=5i
 			PROJ="-JM$HEIGHT"
-		        AXIS=-B${tick}:"":/${tick}:""::."$title":WSne
+			SCALE=`echo $bds | awk -F "/" -v s=$verticalexaggeration '{printf("%f\n",5/($2-$1)*s)}'`
+			PROJZ="-Jz"$SCALE
+		        #AXIS=-B${tickx}:"":/${ticky}:""::."$title":
+			AXIS=-Bf${tickxf}a${tickx}:"x":/f${tickyf}a${ticky}:"y":/f${tickzf}a${tickz}:"z"::."$title":
 		fi
 
 		echo $self": z-min/z-max for "$U3": "`grdinfo -C $U3 | awk '{print $6,$7}'`
@@ -293,28 +321,34 @@ while [ "$#" != "0" -o "$Oset" == "1" ];do
 
 			# tick marks
 			if [ "$tset" != "1" ]; then
-				tick=`echo $bds | awk -F "/" '{s=1;print ($2-$1)/s/5}'`
+				tickx=`echo $bds | awk -F "/" '{s=1;print ($2-$1)/s/5}'`
+				ticky=`echo $bds | awk -F "/" '{s=1;print ($4-$3)/s/5}'`
 				tickz=`echo $bds | awk -F "/" '{s=1;print ($6-$5)/s/5}'`
 			fi
-			tickf=`echo $tick | awk '{print $1/4}'`
-			tickzf=`echo $tickz | awk '{print $1/4}'`
+			tickxf=`echo $tickx | awk '{print $1/2}'`
+			tickyf=`echo $ticky | awk '{print $1/2}'`
+			tickzf=`echo $tickz | awk '{print $1/2}'`
 
 			# Cartesian vs geographic coordinates
 			if [ "$gset" != "-g" ]; then
-				HEIGHT=`echo $bds | awk -F "/" '{printf("%fi\n",($4-$3)/($2-$1)*5)}'`
-				SCALE=`echo $bds | awk -F "/" -v s=$verticalexxageration '{printf("%f\n",5/($2-$1)*s)}'`
+				if [ "$Hset" == "" ]; then
+					HEIGHT=`echo $bds | awk -F "/" -v s=$SIZE '{printf("%fi\n",($4-$3)/($2-$1)*s)}'`
+				else
+					HEIGHT="7i"
+				fi
+				SCALE=`echo $bds | awk -F "/" -v v=$verticalexaggeration -v s=$SIZE '{printf("%f\n",s/($2-$1)*v)}'`
 				if [ "$rset" != "1" ]; then
-					PROJ=-JX5i/$HEIGHT
+					PROJ=-JX${SIZE}i/$HEIGHT
 					PROJZ=-Jz$SCALE
 				else
-					PROJ=-JX5i/-$HEIGHT
+					PROJ=-JX${SIZE}i/-$HEIGHT
 					PROJZ=-Jz$SCALE
 				fi
-			        AXIS=-Ba${tick}:"":/a${tick}:"":/f${tickzf}a${tickz}:""::."$TITLE":
+			        AXIS=-Ba${tickx}:"x":/a${ticky}:"y":/f${tickzf}a${tickz}:"z"::."$TITLE":
 			else
-				HEIGHT=5i
+				HEIGHT=${SIZE}i
 				PROJ="-JM0/0/$HEIGHT"
-			        AXIS=-B${tick}:"":/${tick}:"":/f50:""::."$TITLE":WSne
+			        AXIS=-B${tickx}:"":/${ticky}:"":/f50:""::."$TITLE":WSne
 			fi
 		fi
 	fi
@@ -340,7 +374,7 @@ while [ "$#" != "0" -o "$Oset" == "1" ];do
 		#gv -geometry +0+0 -spartan -scale=0.5 $PSFILE &
 		ps2pdf -sPAPERSIZE="archA" -dPDFSETTINGS=/prepress $PSFILE $PDFFILE
 		echo $self": Converted to pdf file "$PDFFILE
-		xpdf -geometry +0+0 -paper "archA" $PDFFILE -z 100 -g 565x655 >& /dev/null &
+		xpdf -geometry +0+0 -paper "archA" $PDFFILE -z 100 -g 565x755 -z width >& /dev/null &
 	fi
 	
 	if [ "$#" != "0" ];then

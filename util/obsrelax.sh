@@ -6,16 +6,17 @@ cmdline=$*
 trap 'echo $self: Some errors occurred. Exiting.; exit' ERR
 
 usage(){
-	echo "usage: $self [-r gpsr.txt] [-t time0/../time1] gps1.txt [... gpsN.txt]"
+	echo "usage: $self [-r gpsr.ned] [-t time0/../time1] gps1.ned [... gpsN.ned]"
 	echo or
-	echo "       $self -t 0/7 gp*.txt"
+	echo "       $self -t 0/7 gp*.ned"
 	echo  
-	echo removes the coseismic component from the time series gps1.txt ... gpsN.txt
+	echo removes the coseismic component from the time series gps1.ned ... gpsN.ned
 	echo and optionally outputs the displacement relative to station gpsr
 	echo ""
 	echo options:
-	echo    -r  gps1.txt  compute the displacements relative to station gps1.txt
+	echo    -r  gps1.ned  compute the displacements relative to station gps1.ned
 	echo    -t  time      remove coseismic displacements at given times t1/../t3 [0].
+	echo    -s  silent    doesnt print messages on the standard output.
 	echo 
 	echo example:  obsrelax.sh "output{1,2,3,4,5,6,7}/{lae1,lae2,lae3,lae4,law1,law2,law3,law4,oldw,oldd,meek,rich,sanh}"
 	echo 
@@ -23,7 +24,7 @@ usage(){
 
 stripoffset(){
 	WDIR=$(dirname $1)
-	IFILE=$WDIR/$(basename $1 .txt).txt
+	IFILE=$WDIR/$(basename $1 .ned).ned
 	if [ "$rset" != "1" ];then
 		EVENTS=`grep -v "#" $IFILE | \
 			awk -v t="$EPOCHS" 'BEGIN{ \
@@ -31,7 +32,7 @@ stripoffset(){
 			}{ \
 			for (t in time){ \
 				if (time[t]<=$1){ \
-					print NR; \
+					printf "%d ",NR; \
 					delete time[t]; \
 				}; \
 			}; \
@@ -45,12 +46,14 @@ stripoffset(){
 			# if output (1) is redirected, print to stdout
 			OFILE=/dev/stdout
 		else
-			OFILE=$WDIR/$(basename $1 .txt)-relax.txt
-			echo $self: changing $IFILE to $OFILE
+			OFILE=$WDIR/$(basename $1 .ned)-relax.ned
+		    if [ "$sset" != "1" ]; then
+				echo $self: changing $IFILE to $OFILE
+			fi
 		fi
 
 		grep -v "#" $IFILE |
-			awk -v e="$EVENTS" -v value="$time" \
+			awk -v e="$EVENTS" \
 				'BEGIN{ \
 					print "#         t         u1         u2         u3        s11        s12        s13        s22        s23        s33"; \
 					split(e,events," "); \
@@ -70,7 +73,7 @@ stripoffset(){
 			}' > $OFILE
 	else
 		# postseismic displacement relative to reference station
-		OFILE=$WDIR/$(basename $1 .txt)-$REF-relax.txt
+		OFILE=$WDIR/$(basename $1 .ned)-$REF-relax.ned
 		echo $self: change $IFILE to $OFILE
 		grep -v "#" $IFILE | awk '{if (1==NR){i2=$2;i3=$3;i4=$4;i5=$5;i6=$6;i7=$7;i8=$8;i9=$9;i10=$10}; \
 			$2=$2-i2;$3=$3-i3;$4=$4-i4;$5=$5-i5;$6=$6-i6;$7=$7-i7;$8=$8-i8;$9=$9-i9;$10=$10ii10;print $0}' | \
@@ -85,20 +88,25 @@ if [ "$#" == "0" ]; then
 	exit 1
 fi
 
-while getopts "r:t:" flag
+while getopts "r:t:s:" flag
 do
   case "$flag" in
     r) rset=1;RFILE=$OPTARG;;
     t) tset=1;EPOCHS="$OPTARG";;
+	s) sset=1;;
   esac
 done
 for i in $rset $tset; do
         shift;shift
 done
 
+for i in $sset; do
+        shift;
+done
+
 if [ "$rset" == "1" ];then
 	TMP=temp
-	REF=$(basename $RFILE .txt)
+	REF=$(basename $RFILE .ned)
 	grep -v "#" $RFILE | \
 		awk '{if (1==NR){i2=$2;i3=$3;i4=$4;i5=$5;i6=$6;i7=$7;i8=$8;i9=$9;i10=$10}; \
 			print $2-i2,$3-i3,$4-i4,$5-i5,$6-i6,$7-i7,$8-i8,$9-i9,$10-i10}' > $TMP
